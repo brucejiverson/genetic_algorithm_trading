@@ -1,0 +1,25 @@
+[tool.poetry]
+name = "genetic_algorithm_trading"
+version = "1.0.0"
+description = "Test ground for NEAT optimizations of trading strategies."
+authors = ["brucejiverson <brucejamesiverson@gmail.com>"]
+license = "MIT"
+classifiers = [
+   "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+]
+
+
+[tool.poetry.dependencies]
+python = "^3.10.0"
+neat-python = "^0.92"
+graphviz = "^0.20.1"    # note that this requires more installation as detailed here: https://forum.graphviz.org/t/new-simplified-installation-procedure-on-windows/224
+# local dependency to the testing platform
+parallelized_algorithmic_trader = {path = "../parallelized_algorithmic_trader", develop = true}
+pureples = {path = "../../../pureples", develop = true}
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.masonry.api"
+
