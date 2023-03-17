@@ -1,28 +1,71 @@
-from typing import Any, List, Callable
+from typing import Any, List, Callable, Dict
+import datetime
 import neat
 import pickle 
 from enum import Enum
 import os
-import logging
+from dataclasses import dataclass, field
 
+from parallelized_algorithmic_trader.data_management.historical_data import CandleData
+from parallelized_algorithmic_trader.data_management.data_utils import TemporalResolution
 from parallelized_algorithmic_trader.indicators import IndicatorMapping
-from parallelized_algorithmic_trader.data_management.market_data import CandleData
 from parallelized_algorithmic_trader.strategy import StrategyConfig
 from parallelized_algorithmic_trader.backtest import build_features, run_simulation_on_candle_data, set_train_test_true, get_training_start_end_dates
 
 import genetic_algorithm_trading.utils.visualize as neat_visualize
-from genetic_algorithm_trading.neat.agent import NEATEqualAllocation
+from genetic_algorithm_trading.agent import NEATEqualAllocation
 
 
 ROOT_DIR = os.path.dirname(__file__).split('genetic_algorithm_trading')[0] 
 MODEL_DIR = os.path.join(ROOT_DIR, 'genetic_algorithm_trading/models')
-    
-    
+IMAGES_DIR = os.path.join(ROOT_DIR, 'genetic_algorithm_trading/images')
+
+
 class GeneticAlgorithmModelType(Enum):
     NEAT = 'neat'
     HYPERNEAT = 'hyperneat'
     ES_HYPERNEAT = 'es_hyperneat'
 
+
+@dataclass
+class NEATModelMetaInfo:
+    """A class for containing all of the information about the NEAT model including training information"""
+    
+    model_type:GeneticAlgorithmModelType
+    genome:neat.DefaultGenome
+    config:neat.Config
+    neural_net:neat.nn.FeedForwardNetwork
+    indicator_mapping:IndicatorMapping
+    tickers:List[str]
+    resolution:TemporalResolution
+    training_start:datetime.datetime|None=None
+    training_end:datetime.datetime|None=None
+    other_training_hyperparameters:Dict[str, Any]=field(default_factory=dict)
+    
+    def __post_init__(self):
+        if not self.training_start or not self.training_end:
+            self.training_start, self.training_end = get_training_start_end_dates()
+    
+    def to_pickle(self, file_name:str=None):
+        """Save the model meta info to a pickle file in the models directory. If no file name is provided, the default"""
+        if not file_name:
+            file_name = f'{self.model_type.value}_winner.pkl'
+            
+        with open(os.path.join(MODEL_DIR, file_name), 'wb') as f:
+            pickle.dump(self, f)
+                
+        print(f'Saved genome for neural net to {MODEL_DIR}')
+
+    @classmethod
+    def read_pickle(cls, file_name:str):
+        """Read the model meta info from a pickle file in the models directory"""
+        with open(os.path.join(MODEL_DIR, file_name), 'rb') as f:
+            obj = pickle.load(f)
+            
+        assert isinstance(obj, cls), f'Object read from {file_name} is not of type {cls.__name__}: {type(obj)}'
+        print(f'Loaded a {obj.model_type.value} model from {MODEL_DIR}')
+        return obj
+    
 
 def get_neat_config_param(config_path:str, param_name:str) -> int:
     """Get the number of inputs for the NEAT network"""
@@ -96,6 +139,7 @@ def test_genome_single_stock_set(net:neat.nn.FeedForwardNetwork, tickers:List[st
         use_test_data=use_test_data,
         verbose=True,
         plot=True,
+        folder_to_save_plots=os.path.join(IMAGES_DIR, 'test' if use_test_data else 'train'),
     )
     return result
 
@@ -134,14 +178,7 @@ def run(
 
     print('\nBest genome:\n{!s}'.format(winning_genome))
 
-    save_model(
-        GeneticAlgorithmModelType.NEAT,
-        winning_genome,
-        CONFIG,
-        indicator_mapping,
-        data.resolution)
-
-    node_names = {}
+    node_names = {'A':0}
     
     neat_visualize.draw_neat_net(CONFIG, winning_genome, True, node_names=node_names)
     neat_visualize.plot_stats(stats, ylog=False, view=True)
@@ -158,34 +195,14 @@ def run(
     return winning_genome
 
 
-def save_model(
-    model_type:GeneticAlgorithmModelType,
-    genome:neat.DefaultGenome,
-    config:neat.Config, 
-    indicator_mapping:IndicatorMapping,
-    data_resolution,
-    file_name=None
-    ):
-    
-    if not file_name:
-        file_name = f'{model_type.value}_winning_model.pkl'
-    
-    file_path = os.path.join(MODEL_DIR, file_name)
-    s, e = get_training_start_end_dates()
-    with open(file_path, 'wb') as f:
-        pickle.dump({
-            'model_type': model_type.value,
-            'winning_genome':genome, 
-            'config': config, 
-            'indicator_mapping':indicator_mapping, 
-            'resolution':data_resolution,
-            'training_start':s,
-            'training_end':e,
-            }, f)
-    print(f'Saved genome for neural net to {MODEL_DIR}')
-
-
-def run_k_fold_training(config_path:str, eval_genomes:Callable, indicator_mapping:IndicatorMapping, data:CandleData, test_data:CandleData=None, max_generations:int=100, k:int=5):
+def run_k_fold_training(
+    config_path:str, 
+    eval_genomes:Callable, 
+    indicator_mapping:IndicatorMapping, 
+    data:CandleData, 
+    test_data:CandleData=None, 
+    max_generations:int=100, 
+    k:int=5):
 
     n_features = 0
     for i_config in indicator_mapping:
@@ -255,6 +272,8 @@ def delete_all_images():
                     continue
                 os.remove(os.path.join(root, file))
     
-    delete_all_files_in_folder(os.path.join(os.curdir, 'images'))
+    for folder in ['.', 'train', 'test', 'model_and_training']:
+    
+        delete_all_files_in_folder(os.path.join(os.curdir, 'images'+'/'+folder))
     
     

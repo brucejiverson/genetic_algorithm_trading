@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 
-def plot_stats(statistics, ylog=False, view=False, filename='images/avg_fitness.svg'):
+def plot_stats(statistics, ylog=False, view=False, filename='images/model_and_training/avg_fitness.svg'):
     """ Plots the population's average and best fitness. """
     if plt is None:
         warnings.warn("This display is not available due to a missing optional dependency (matplotlib)")
@@ -85,7 +85,7 @@ def plot_spikes(spikes, view=False, filename=None, title=None):
     return fig
 
 
-def plot_species(statistics, view=False, filename='images/speciation.svg'):
+def plot_species(statistics, view=False, filename='images/model_and_training/speciation.svg'):
     """ Visualizes speciation throughout evolution. """
     if plt is None:
         warnings.warn("This display is not available due to a missing optional dependency (matplotlib)")
@@ -114,7 +114,7 @@ def draw_neat_net(
     config:neat.Config, 
     genome:neat.DefaultGenome, 
     view=False, 
-    filename='images/neural_net', 
+    filename='images/model_and_training/neural_net', 
     node_names={}, 
     show_disabled=True,
     node_colors=None, 
@@ -138,6 +138,7 @@ def draw_neat_net(
     inputs = set()
     for k in config.genome_config.input_keys:
         inputs.add(k)
+        print(f'getting k: {k}, node_names: {node_names}')
         name = node_names.get(k, str(k))
         input_attrs = {'style': 'filled', 'shape': 'box', 'fillcolor': node_colors.get(k, 'lightgray')}
         dot.node(name, _attributes=input_attrs)

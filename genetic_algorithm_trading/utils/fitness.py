@@ -1,6 +1,6 @@
 from __future__ import annotations
 import random
-from parallelized_algorithmic_trader.broker import SimulatedAccount
+from parallelized_algorithmic_trader.trading.simulated_broker import SimulatedAccount
 
 
 def get_random_fitness_func_type(weights:dict[function,float]) -> function:

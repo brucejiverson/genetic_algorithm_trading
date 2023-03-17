@@ -2,23 +2,22 @@ from __future__ import annotations
 import neat
 import logging
 import datetime
-from typing import Tuple
+from typing import Tuple, List
 
-from parallelized_algorithmic_trader.data_management.polygon_io import get_candle_data
-from parallelized_algorithmic_trader.broker import TemporalResolution
+from parallelized_algorithmic_trader.data_management.historical_data import get_candle_data
+from parallelized_algorithmic_trader.data_management.data_utils import TemporalResolution
 from parallelized_algorithmic_trader.backtest import StrategyConfig, run_simulation_on_candle_data
 import parallelized_algorithmic_trader.performance_analysis as pf_anal
 from parallelized_algorithmic_trader.indicators import IndicatorConfig, IndicatorMapping
 import parallelized_algorithmic_trader.indicators as indicators
 
 from genetic_algorithm_trading.utils.fitness import get_random_fitness_func_type
-from genetic_algorithm_trading.utils.utils import *
+import genetic_algorithm_trading.utils.utils as utils
+from genetic_algorithm_trading.agent import NEATEqualAllocation
 
 
 # inherits all properties from the pat library
 logger = logging.getLogger('pat.neat')
-# root_logger = logging.getLogger('pat')
-# root_logger.setLevel(logging.WARNING)
 
 
 def eval_genomes(genomes:List[Tuple[int, neat.DefaultGenome]], config:neat.Config):
@@ -65,14 +64,10 @@ def eval_genomes(genomes:List[Tuple[int, neat.DefaultGenome]], config:neat.Confi
 
 
 if __name__ == '__main__':
-    # Determine path to configuration file. This path manipulation is
-    # here so that the script will run successfully regardless of the
-    # current working directory.
     import os
-    local_dir = os.path.dirname(__file__)
-    NEAT_CONFIG_PATH = os.path.join(local_dir, './neat_config.txt')
+    NEAT_CONFIG_PATH = os.path.join(os.path.dirname(__file__), 'neat_config.txt')
 
-    tickers = ['SPDN', 'SPY']
+    tickers = ['SPY']
 
     indicator_mapping:IndicatorMapping= []
     for t in tickers:
@@ -107,15 +102,32 @@ if __name__ == '__main__':
     end = datetime.datetime.now()
     start = end - datetime.timedelta(days=n_days)
     
-    data = get_candle_data(os.environ['POLYGON_IO'], tickers, start, end, TemporalResolution.HOUR)
-    configure_neat_inputs_and_outputs(NEAT_CONFIG_PATH, indicator_mapping, data.tickers)
+    data = get_candle_data(tickers, TemporalResolution.HOUR, start, end)
+    utils.configure_neat_inputs_and_outputs(NEAT_CONFIG_PATH, indicator_mapping, data.tickers)
     
-    run(
+    winning_genome = utils.run(
         NEAT_CONFIG_PATH, 
         eval_genomes, 
-        test_genome_single_stock_set, 
+        utils.test_genome_single_stock_set, 
         neat.nn.FeedForwardNetwork.create,
         indicator_mapping, 
         data, 
         max_generations=4)
 
+    CONFIG = neat.Config(neat.DefaultGenome, neat.DefaultReproduction,
+                         neat.DefaultSpeciesSet, neat.DefaultStagnation,
+                         NEAT_CONFIG_PATH)
+
+    model_data = utils.NEATModelMetaInfo(
+        utils.GeneticAlgorithmModelType.NEAT,
+        winning_genome,
+        CONFIG,
+        neat.nn.FeedForwardNetwork.create(winning_genome, CONFIG),
+        indicator_mapping,
+        tickers,
+        data.resolution,
+        other_training_hyperparameters={'tickers without features': tickers[1:]}
+        )
+
+    model_data.to_pickle()
+    

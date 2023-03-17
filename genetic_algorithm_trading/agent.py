@@ -7,7 +7,7 @@ from typing import List, Dict
 from parallelized_algorithmic_trader.orders import MarketOrder, OrderBase, OrderSide
 from parallelized_algorithmic_trader.indicators import IndicatorMapping
 from parallelized_algorithmic_trader.strategy import StrategyBase 
-from parallelized_algorithmic_trader.broker import SimulatedAccount
+from parallelized_algorithmic_trader.trading.simulated_broker import SimulatedAccount
 
 
 class NEATEqualAllocation(StrategyBase):
@@ -63,4 +63,5 @@ class NEATEqualAllocation(StrategyBase):
         # get just the items out of the series that are needed for the neural net: drop the timestamp
         if 'timestamp' in state.keys(): state.pop('timestamp')
         output = self.neural_net.activate(state.values())  # the item here just has to be some sort of collection
+        self.logger.debug(f'Net output: {output}')
         return self._convert_nn_output_to_action_multi_node(account, output)

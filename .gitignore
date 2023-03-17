@@ -1,0 +1,6 @@
+# Ignore local test environment
+.python-version
+
+# Ignore pycache files
+*__pycache__
+

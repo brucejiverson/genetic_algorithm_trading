@@ -1,25 +1,24 @@
 """
 An experiment using a variable-sized ES-HyperNEAT network 
 """
-from typing import List, Callable
+from typing import List
 import logging
-import pickle
 import neat
 from enum import Enum
 
 import pureples
 
 from parallelized_algorithmic_trader.data_management.polygon_io import get_candle_data
-from parallelized_algorithmic_trader.broker import TemporalResolution
+from parallelized_algorithmic_trader.data_management.historical_data import get_candle_data
 from parallelized_algorithmic_trader.backtest import *
 import parallelized_algorithmic_trader.performance_analysis as pf_anal
 from parallelized_algorithmic_trader.indicators import IndicatorConfig, IndicatorMapping
 import parallelized_algorithmic_trader.indicators as indicators
 
-from genetic_algorithm_trading.neat.agent import NEATEqualAllocation
+from genetic_algorithm_trading.agent import NEATEqualAllocation
 from genetic_algorithm_trading.utils.fitness import get_random_fitness_func_type
 import genetic_algorithm_trading.utils.utils as utils
-import genetic_algorithm_trading.utils.visualize as visualize
+from genetic_algorithm_trading.indicators import *
 
 
 class SubstrateSize(Enum):
@@ -51,18 +50,21 @@ CONFIG = neat.Config(neat.DefaultGenome, neat.DefaultReproduction,
 
 # Network input and output coordinates.
 NODE_SPACING = 1
-NODE_SHIFT = NODE_SPACING/2 if NODE_SPACING%2 == 1 else 0
 SUBSTRATE = None    # by placing the nodes carefully, one can insert knowledge about the system
 
 
 def set_substrate(tickers, indicator_mapping):
+    """Configures a SUBSTRATE object for the ES-HyperNEAT network by dictating the (x,y) location coordinates of the input and output nodes"""
     all_feature_names = [name for ind_config in indicator_mapping for name in ind_config.names]
     N_INPUTS = len(all_feature_names)
     N_OUTPUTS = len(tickers)
 
+    INPUT_NODE_SHIFT = NODE_SPACING/2 if N_INPUTS%2 == 1 else 0
+    OUTPUT_NODE_SHIFT = NODE_SPACING/2 if N_OUTPUTS%2 == 1 else 0
+    
     # input coordinates spaced evenly across the x axis 
-    INPUT_COORDINATES = [(i*NODE_SPACING + NODE_SHIFT, -1.) for i in range(-N_INPUTS // 2, N_INPUTS // 2)]
-    OUTPUT_COORDINATES = [(i*NODE_SPACING + NODE_SHIFT, 1.) for i in range(-N_OUTPUTS // 2, N_OUTPUTS // 2)]
+    INPUT_COORDINATES = [(i*NODE_SPACING + INPUT_NODE_SHIFT, -1.) for i in range(-N_INPUTS // 2, N_INPUTS // 2)]
+    OUTPUT_COORDINATES = [(i*NODE_SPACING + OUTPUT_NODE_SHIFT, 1.) for i in range(-N_OUTPUTS // 2, N_OUTPUTS // 2)]
     global SUBSTRATE
     SUBSTRATE = pureples.shared.Substrate(INPUT_COORDINATES, OUTPUT_COORDINATES)
 
@@ -127,43 +129,43 @@ if __name__ == "__main__":
     tickers = ['SPY']
     
     # set up the data to be used as global variables
-    n_days = 30*24
-    end = datetime.datetime.now()
-    start = end - datetime.timedelta(days=n_days)
-    data = get_candle_data(os.environ['POLYGON_IO'], tickers, start, end, TemporalResolution.HOUR)
+    start = datetime.datetime(year=2021, month=1, day=1)
+    data = get_candle_data(tickers, TemporalResolution.HOUR, start)
     
+    # I've confirmed that these get served to the bot in order. Types of features should get grouped together
     indicator_mapping:IndicatorMapping= []
     for t in tickers:
         new_inds = [
+            
+            # IndicatorConfig(t+'_close', indicators.ZBB, args=(50,2), desired_output_name_keywords=['ZBBB', 'ZBBP']),
+            # IndicatorConfig(t+'_close', indicators.ZBB, args=(200,2), desired_output_name_keywords=['ZBBB', 'ZBBP']),
+            
+            ZBB_change_in_stddev(t+'_close', 25, 50, 2),
+            ZBB_change_in_stddev(t+'_close', 100, 200, 2),
+            
+            slope_ZBB(t+'_close', 50, 2, 1, 5),
+            slope_ZBB(t+'_close', 200, 2, 1, 10),
+            
             IndicatorConfig(t+'_close', indicators.MACD, args=[12, 26, 9]),
-            IndicatorConfig(t, indicators.RSI, scaling_factor=0.1),
-            # IndicatorConfig(t, indicators.SUPERTREND, args=[25,3], desired_output_name_keywords=['SUPERTRENDd']),
-            # IndicatorConfig(t, indicators.SUPERTREND, args=[60,3], desired_output_name_keywords=['SUPERTRENDd']),
-            IndicatorConfig(t+'_close', indicators.BB, args=(30,), desired_output_name_keywords=['BBB']),
-            IndicatorConfig(t+'_close', indicators.PercentBB, args=(30,)),
-            IndicatorConfig(t+'_close', indicators.BB, args=(90,), desired_output_name_keywords=['BBB']),
-            IndicatorConfig(t+'_close', indicators.PercentBB, args=(90,)),
+            IndicatorConfig(t+'_close', indicators.RSI, scaling_factor=0.05, bias=-50),
+            
+            # # IndicatorConfig(t, indicators.SUPERTREND, args=[25,3], desired_output_name_keywords=['SUPERTRENDd']),
+            # # IndicatorConfig(t, indicators.SUPERTREND, args=[60,3], desired_output_name_keywords=['SUPERTRENDd']),
+            # IndicatorConfig(t+'_close', indicators.BB, args=(30,), desired_output_name_keywords=['BBB']),
+            # IndicatorConfig(t+'_close', indicators.PercentBB, args=(30,)),
+            # IndicatorConfig(t+'_close', indicators.BB, args=(90,), desired_output_name_keywords=['BBB']),
+            # IndicatorConfig(t+'_close', indicators.PercentBB, args=(90,)),
         ]
         
         indicator_mapping.extend(new_inds)
         break   # only do it for the first ticker for now
 
-    # {
-        # 'SPY_close_MACD(12, 26, 9)': 0.3755536627253946, 
-        # 'SPY_close_MACDh(12, 26, 9)': 0.18033365613747332, 
-        # 'SPY_close_MACDs(12, 26, 9)': 0.19522000658792127, 
-        # 'SPY_RSI()': 6.938977138578355, 
-        # 'SPY_close_BBB(30,)': 0.8188888831255183, 
-        # 'SPY_close_PercentBB(30,)': 1.0635814982050085, 
-        # 'SPY_close_BBB(90,)': 3.084837385703649, 
-        # 'SPY_close_PercentBB(90,)': 0.8780126397909496}
-
-    pf_anal.set_benchmark_score(data.df[tickers[0] + '_close'], pf_anal.get_curve_fit_vwr)
     fitness_func_weights = {
-        pf_anal.get_vwr_curve_fit_difference: 1
+        # pf_anal.get_curve_fit_vwr: 1
+        pf_anal.get_ROI: 1
     }
     
-    VERSION = SubstrateSize.SMALL
+    VERSION = SubstrateSize.MEDIUM
     CPPN_PARAMS = produce_cppn_params(VERSION)
     set_substrate(tickers, indicator_mapping)
 
@@ -174,17 +176,21 @@ if __name__ == "__main__":
         produce_eshyperneat_net,
         indicator_mapping, 
         data, 
-        max_generations=100)
+        max_generations=40)
 
     CPPN = neat.nn.FeedForwardNetwork.create(winning_genome, CONFIG)
-    pureples.shared.draw_net(CPPN, filename=f"images/es_hyperneat_mountain_car_{VERSION.name}_cppn")
-    produce_eshyperneat_net(winning_genome, CONFIG, filename=f"images/es_hyperneat_mountain_car_{VERSION.name}_winner")
+    pureples.shared.draw_net(CPPN, filename=f"images/model_and_training/es_hyperneat_{VERSION.name}_cppn")
+    net = produce_eshyperneat_net(winning_genome, CONFIG, filename=f"images/model_and_training/es_hyperneat_{VERSION.name}_winner")
     
-    utils.save_model(
+    model_data = utils.NEATModelMetaInfo(
         utils.GeneticAlgorithmModelType.ES_HYPERNEAT,
         winning_genome,
         CONFIG,
+        net,
         indicator_mapping,
-        data.resolution)
+        tickers,
+        data.resolution,
+        )
     
+    model_data.to_pickle()
     
