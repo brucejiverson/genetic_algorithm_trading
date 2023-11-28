@@ -1,5 +1,5 @@
 # Some Interesting Things I Implemented
-- Implementations of NEAT and ES-HyperNEAT
+- Utilization of NEAT and ES-HyperNEAT algorithms from other authors
 - During training, randomizing the stocks that are used to train the model to increase the amount of data
 - Custom/fancy scoring metrics, see `parallelized_algorithmic_trader.performance_analysis.get_curve_fit_vwr`
 - Model persistance
