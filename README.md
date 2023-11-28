@@ -1,7 +1,6 @@
 # Some Interesting Things I Implemented
 - Utilization of NEAT and ES-HyperNEAT algorithms from other authors
 - During training, randomizing the stocks that are used to train the model to increase the amount of data
-- Custom/fancy scoring metrics, see `parallelized_algorithmic_trader.performance_analysis.get_curve_fit_vwr`
 - Model persistance
 - Randomized fitness functions, allowing easy promotion of multiple attributes. Examples: prioritizing returns while also promoting some minimum trading frequency so that model can be validly assesed on some minimum number of trades.
 
@@ -65,6 +64,4 @@ INFO pat.performance_analysis: VWR: 0.045, VWR curve fit: 0.042
 INFO pat.performance_analysis: Alpha relative to ticker SPY 1.63%
 ```
 ## Conclusion
-While the results here are on the surface positive, I expect from experience that this model likely would not make money. The data set here is too small for this to be valid. If you look at the testing, you can see that only 5 trades were executed, far too few for this to be a good estimation of the models performance. This is a demonstration only.
-
-I forgot to save the image of the neural net associated with this.
+While the results here are on the surface positive, I expect this model would lose money. The data set here is too small for this to be valid. If you look at the testing, you can see that only 5 trades were executed, far too few for this to be a good estimation of the models performance. This is a demonstration only.
