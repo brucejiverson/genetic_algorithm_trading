@@ -1,4 +1,4 @@
-# Some Interesting Things I Implemented
+# Some Things I Implemented
 - Utilization of NEAT and ES-HyperNEAT algorithms from other authors
 - During training, randomizing the stocks that are used to train the model to increase the amount of data
 - Model persistance
